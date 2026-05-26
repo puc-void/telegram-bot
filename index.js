@@ -35,7 +35,9 @@ BOT SETUP
 ========================================
 */
 
-const bot = new Telegraf(process.env.BOT_TOKEN)
+const bot = new Telegraf(
+    process.env.BOT_TOKEN
+)
 
 /*
 ========================================
@@ -45,8 +47,8 @@ TEMP STATES
 
 const waitingForSignup = {}
 const uploadStates = {}
-const broadcastStates = {}
 const searchStates = {}
+const broadcastStates = {}
 
 /*
 ========================================
@@ -56,48 +58,62 @@ HOME MENU
 
 async function showHome(ctx) {
 
-    await ctx.editMessageText(
+    const text =
 
         `🎓 University Question Collection Bot
 
-Choose an option 👇`,
+Choose an option 👇`
 
-        Markup.inlineKeyboard([
+    const keyboard = Markup.inlineKeyboard([
 
-            [
-                Markup.button.callback(
-                    '💻 CSE',
-                    'cse'
-                ),
+        [
+            Markup.button.callback(
+                '💻 CSE',
+                'cse'
+            ),
 
-                Markup.button.callback(
-                    '📤 Upload',
-                    'upload_pdf'
-                )
-            ],
+            Markup.button.callback(
+                '📤 Upload',
+                'upload_pdf'
+            )
+        ],
 
-            [
-                Markup.button.callback(
-                    '🔍 Search',
-                    'search_menu'
-                ),
+        [
+            Markup.button.callback(
+                '🔍 Search',
+                'search_menu'
+            ),
 
-                Markup.button.callback(
-                    '👨‍💼 Admin',
-                    'admin'
-                )
-            ],
+            Markup.button.callback(
+                '👨‍💼 Admin',
+                'admin'
+            )
+        ],
 
-            [
-                Markup.button.callback(
-                    '🚪 Logout',
-                    'logout'
-                )
-            ]
+        [
+            Markup.button.callback(
+                '🚪 Logout',
+                'logout'
+            )
+        ]
 
-        ])
+    ])
 
-    )
+    try {
+
+        await ctx.editMessageText(
+            text,
+            keyboard
+        )
+
+    } catch {
+
+        await ctx.reply(
+            text,
+            keyboard
+        )
+
+    }
 
 }
 
@@ -109,7 +125,8 @@ START COMMAND
 
 bot.start(async (ctx) => {
 
-    const telegramId = String(ctx.from.id)
+    const telegramId =
+        String(ctx.from.id)
 
     const userDoc = await db
         .collection('users')
@@ -183,177 +200,189 @@ Choose an option 👇`,
 
     )
 
+})
+
+/*
+========================================
+TEXT SYSTEM
+========================================
+*/
+
+bot.on('text', async (ctx) => {
+
+    const telegramId =
+        String(ctx.from.id)
+
+    const message =
+        ctx.message.text
+
     /*
-    ========================================
-    TEXT SYSTEM
-    ========================================
+    SIGNUP
     */
 
-    bot.on('text', async (ctx) => {
+    if (waitingForSignup[telegramId]) {
 
-        const telegramId = String(ctx.from.id)
-
-        const message = ctx.message.text
-
-        /*
-        SIGNUP
-        */
-
-        if (waitingForSignup[telegramId]) {
-
-            if (message.length < 5) {
-
-                return ctx.reply(
-                    '❌ Invalid Student ID'
-                )
-
-            }
-
-            let role = 'student'
-
-            if (
-                telegramId === process.env.ADMIN_ID
-            ) {
-
-                role = 'admin'
-
-            }
-
-            await db.collection('users')
-                .doc(telegramId)
-                .set({
-
-                    studentId: message,
-
-                    telegramId: telegramId,
-
-                    firstName:
-                        ctx.from.first_name || '',
-
-                    username:
-                        ctx.from.username || '',
-
-                    role: role,
-
-                    uploads: 0,
-
-                    createdAt: new Date()
-
-                })
-
-            delete waitingForSignup[telegramId]
+        if (message.length < 5) {
 
             return ctx.reply(
-
-                `✅ Signup Successful
-
-Now send /start again.`
-
+                '❌ Invalid Student ID'
             )
 
         }
 
-        /*
-        COURSE INPUT FOR UPLOAD
-        */
+        let role = 'student'
 
         if (
-            uploadStates[telegramId] &&
-            uploadStates[telegramId].waitingCourse
+            telegramId ===
+            process.env.ADMIN_ID
         ) {
 
-            uploadStates[telegramId].courseCode =
-                message.toUpperCase()
+            role = 'admin'
 
-            uploadStates[telegramId].waitingCourse =
-                false
+        }
 
-            uploadStates[telegramId].readyForPDF =
-                true
+        await db
+            .collection('users')
+            .doc(telegramId)
+            .set({
 
-            return ctx.reply(
+                studentId: message,
 
-                `✅ Course Saved
+                telegramId: telegramId,
+
+                firstName:
+                    ctx.from.first_name || '',
+
+                username:
+                    ctx.from.username || '',
+
+                role: role,
+
+                uploads: 0,
+
+                createdAt: new Date()
+
+            })
+
+        delete waitingForSignup[telegramId]
+
+        return ctx.reply(
+
+            `✅ Signup Successful
+
+Now send /start again.`
+
+        )
+
+    }
+
+    /*
+    COURSE INPUT FOR UPLOAD
+    */
+
+    if (
+        uploadStates[telegramId] &&
+        uploadStates[telegramId]
+            .waitingCourse
+    ) {
+
+        uploadStates[
+            telegramId
+        ].courseCode =
+            message.toUpperCase()
+
+        uploadStates[
+            telegramId
+        ].waitingCourse = false
+
+        uploadStates[
+            telegramId
+        ].readyForPDF = true
+
+        return ctx.reply(
+
+            `✅ Course Saved
 
 📚 ${message.toUpperCase()}
 
 Now send PDF file 👇`
 
+        )
+
+    }
+
+    /*
+    SEARCH COURSE INPUT
+    */
+
+    if (
+        searchStates[telegramId] &&
+        searchStates[telegramId]
+            .waitingCourse
+    ) {
+
+        const searchData =
+            searchStates[telegramId]
+
+        const courseCode =
+            message.toUpperCase()
+
+        const snapshot = await db
+            .collection('questions')
+            .where(
+                'courseCode',
+                '==',
+                courseCode
+            )
+            .where(
+                'semester',
+                '==',
+                searchData.session
+            )
+            .where(
+                'questionType',
+                '==',
+                searchData.questionType
+            )
+            .where(
+                'status',
+                '==',
+                'approved'
+            )
+            .get()
+
+        if (snapshot.empty) {
+
+            delete searchStates[telegramId]
+
+            return ctx.reply(
+                '❌ No Questions Found'
             )
 
         }
 
-        /*
-        SEARCH COURSE INPUT
-        */
+        await ctx.reply(
 
-        if (
-            searchStates[telegramId] &&
-            searchStates[telegramId].waitingCourse
-        ) {
-
-            const searchData =
-                searchStates[telegramId]
-
-            const courseCode =
-                message.toUpperCase()
-
-            const snapshot = await db
-                .collection('questions')
-                .where(
-                    'courseCode',
-                    '==',
-                    courseCode
-                )
-                .where(
-                    'semester',
-                    '==',
-                    searchData.session
-                )
-                .where(
-                    'questionType',
-                    '==',
-                    searchData.questionType
-                )
-                .where(
-                    'status',
-                    '==',
-                    'approved'
-                )
-                .get()
-
-            if (snapshot.empty) {
-
-                delete searchStates[telegramId]
-
-                return ctx.reply(
-                    '❌ No Questions Found'
-                )
-
-            }
-
-            await ctx.reply(
-
-                `✅ ${snapshot.size} Question(s) Found
+            `✅ ${snapshot.size} Question(s) Found
 
 📚 ${courseCode}
 📅 ${searchData.session}
 📄 ${searchData.questionType.toUpperCase()}`
 
-            )
+        )
 
-            snapshot.forEach(async (doc) => {
+        snapshot.forEach(async (doc) => {
 
-                const data = doc.data()
+            const data = doc.data()
 
-                await ctx.replyWithDocument(
+            await ctx.replyWithDocument(
 
-                    data.fileId,
+                data.fileId,
 
-                    {
-                        caption:
+                {
+                    caption:
 
-                            `📚 ${data.courseCode}
+                        `📚 ${data.courseCode}
 
 📄 ${data.questionType}
 
@@ -361,67 +390,69 @@ Now send PDF file 👇`
 
 📁 ${data.fileName}`
 
-                    }
+                }
 
-                )
+            )
 
-            })
+        })
 
-            delete searchStates[telegramId]
+        delete searchStates[telegramId]
 
-        }
+    }
 
-        /*
-        BROADCAST
-        */
+    /*
+    BROADCAST
+    */
 
-        if (broadcastStates[telegramId]) {
+    if (broadcastStates[telegramId]) {
 
-            const users = await db
-                .collection('users')
-                .get()
+        const users = await db
+            .collection('users')
+            .get()
 
-            users.forEach(async (user) => {
+        users.forEach(async (user) => {
 
-                const userData = user.data()
+            const userData = user.data()
 
-                try {
+            try {
 
-                    await ctx.telegram.sendMessage(
+                await ctx.telegram.sendMessage(
 
-                        userData.telegramId,
+                    userData.telegramId,
 
-                        `📢 Notice
+                    `📢 Notice
 
 ${message}`
 
-                    )
+                )
 
-                } catch (error) {
+            } catch (error) {
 
-                    console.log(error)
+                console.log(error)
 
-                }
+            }
 
-            })
+        })
 
-            delete broadcastStates[telegramId]
+        delete broadcastStates[telegramId]
 
-            return ctx.reply(
-                '✅ Notice Broadcasted'
-            )
+        return ctx.reply(
+            '✅ Notice Broadcasted'
+        )
 
-        }
+    }
 
-    })
+})
 
-    /*
-    ========================================
-    UPLOAD MENU
-    ========================================
-    */
+/*
+========================================
+UPLOAD MENU
+========================================
+*/
 
-    bot.action('upload_pdf', async (ctx) => {
+bot.action(
+    'upload_pdf',
+    async (ctx) => {
 
         await ctx.answerCbQuery()
 
@@ -468,19 +499,24 @@ Choose Question Type 👇`,
 
         )
 
-    })
+    }
+)
 
-    /*
-    ========================================
-    UPLOAD TYPE
-    ========================================
-    */
+/*
+========================================
+UPLOAD TYPE
+========================================
+*/
 
-    bot.action(/^upload_(.+)$/, async (ctx) => {
+bot.action(
+    /^upload_(.+)$/,
+    async (ctx) => {
 
-        const telegramId = String(ctx.from.id)
+        const telegramId =
+            String(ctx.from.id)
 
-        const type = ctx.match[1]
+        const type =
+            ctx.match[1]
 
         uploadStates[telegramId] = {
 
@@ -531,27 +567,36 @@ Choose Question Type 👇`,
 
         )
 
-    })
+    }
+)
 
-    /*
-    ========================================
-    SESSION SELECT
-    ========================================
-    */
+/*
+========================================
+SESSION SELECT
+========================================
+*/
 
-    bot.action(/^session_(.+)$/, async (ctx) => {
+bot.action(
+    /^session_(.+)$/,
+    async (ctx) => {
 
-        const telegramId = String(ctx.from.id)
+        const telegramId =
+            String(ctx.from.id)
 
-        if (!uploadStates[telegramId]) return
+        if (
+            !uploadStates[telegramId]
+        ) return
 
-        const session = ctx.match[1]
+        const session =
+            ctx.match[1]
 
-        uploadStates[telegramId].semester =
-            session
+        uploadStates[
+            telegramId
+        ].semester = session
 
-        uploadStates[telegramId].waitingCourse =
-            true
+        uploadStates[
+            telegramId
+        ].waitingCourse = true
 
         await ctx.answerCbQuery()
 
@@ -575,21 +620,29 @@ CSE221`,
 
         )
 
-    })
+    }
+)
 
-    /*
-    ========================================
-    PDF UPLOAD
-    ========================================
-    */
+/*
+========================================
+PDF UPLOAD
+========================================
+*/
 
-    bot.on('document', async (ctx) => {
+bot.on(
+    'document',
+    async (ctx) => {
 
-        const telegramId = String(ctx.from.id)
+        const telegramId =
+            String(ctx.from.id)
 
         if (
-            !uploadStates[telegramId] ||
-            !uploadStates[telegramId].readyForPDF
+            !uploadStates[
+            telegramId
+            ] ||
+            !uploadStates[
+                telegramId
+            ].readyForPDF
         ) return
 
         const document =
@@ -610,6 +663,30 @@ CSE221`,
 
         }
 
+        /*
+        DUPLICATE CHECK
+        */
+
+        const existing =
+            await db
+                .collection(
+                    'questions'
+                )
+                .where(
+                    'fileName',
+                    '==',
+                    document.file_name
+                )
+                .get()
+
+        if (!existing.empty) {
+
+            return ctx.reply(
+                '❌ PDF Already Uploaded'
+            )
+
+        }
+
         const uploadData =
             uploadStates[telegramId]
 
@@ -617,35 +694,39 @@ CSE221`,
         SAVE PDF
         */
 
-        await db.collection('questions').add({
+        await db
+            .collection('questions')
+            .add({
 
-            uploadedBy: telegramId,
+                uploadedBy:
+                    telegramId,
 
-            fileName:
-                document.file_name,
+                fileName:
+                    document.file_name,
 
-            fileId:
-                document.file_id,
+                fileId:
+                    document.file_id,
 
-            department: 'CSE',
+                department: 'CSE',
 
-            questionType:
-                uploadData.questionType,
+                questionType:
+                    uploadData.questionType,
 
-            semester:
-                uploadData.semester,
+                semester:
+                    uploadData.semester,
 
-            courseCode:
-                uploadData.courseCode,
+                courseCode:
+                    uploadData.courseCode,
 
-            status: 'pending',
+                status: 'pending',
 
-            createdAt: new Date()
+                createdAt:
+                    new Date()
 
-        })
+            })
 
         /*
-        UPDATE UPLOAD COUNT
+        UPDATE USER
         */
 
         await db
@@ -660,9 +741,11 @@ CSE221`,
 
             })
 
-        delete uploadStates[telegramId]
+        delete uploadStates[
+            telegramId
+        ]
 
-        ctx.reply(
+        await ctx.reply(
 
             `✅ PDF Uploaded Successfully
 
@@ -676,15 +759,18 @@ CSE221`,
 
         )
 
-    })
+    }
+)
 
-    /*
-    ========================================
-    SEARCH MENU
-    ========================================
-    */
+/*
+========================================
+SEARCH MENU
+========================================
+*/
 
-    bot.action('search_menu', async (ctx) => {
+bot.action(
+    'search_menu',
+    async (ctx) => {
 
         await ctx.answerCbQuery()
 
@@ -731,103 +817,104 @@ Choose Session 👇`,
 
         )
 
-    })
+    }
+)
 
-    /*
-    ========================================
-    SEARCH SESSION
-    ========================================
-    */
+/*
+========================================
+SEARCH SESSION
+========================================
+*/
 
-    bot.action(
-        /^search_session_(.+)$/,
-        async (ctx) => {
+bot.action(
+    /^search_session_(.+)$/,
+    async (ctx) => {
 
-            const session =
-                ctx.match[1]
+        const session =
+            ctx.match[1]
 
-            await ctx.answerCbQuery()
+        await ctx.answerCbQuery()
 
-            await ctx.editMessageText(
+        await ctx.editMessageText(
 
-                `📅 ${session}
+            `📅 ${session}
 
 Choose Question Type 👇`,
 
-                Markup.inlineKeyboard([
+            Markup.inlineKeyboard([
 
-                    [
-                        Markup.button.callback(
-                            '📄 Mid',
-                            `search_type_mid_${session}`
-                        ),
+                [
+                    Markup.button.callback(
+                        '📄 Mid',
+                        `search_type_mid_${session}`
+                    ),
 
-                        Markup.button.callback(
-                            '📄 Final',
-                            `search_type_final_${session}`
-                        )
-                    ],
+                    Markup.button.callback(
+                        '📄 Final',
+                        `search_type_final_${session}`
+                    )
+                ],
 
-                    [
-                        Markup.button.callback(
-                            '🎤 Viva',
-                            `search_type_viva_${session}`
-                        ),
+                [
+                    Markup.button.callback(
+                        '🎤 Viva',
+                        `search_type_viva_${session}`
+                    ),
 
-                        Markup.button.callback(
-                            '🧪 Lab',
-                            `search_type_lab_${session}`
-                        )
-                    ],
+                    Markup.button.callback(
+                        '🧪 Lab',
+                        `search_type_lab_${session}`
+                    )
+                ],
 
-                    [
-                        Markup.button.callback(
-                            '⬅ Back',
-                            'search_menu'
-                        )
-                    ]
+                [
+                    Markup.button.callback(
+                        '⬅ Back',
+                        'search_menu'
+                    )
+                ]
 
-                ])
+            ])
 
-            )
+        )
+
+    }
+)
+
+/*
+========================================
+SEARCH TYPE
+========================================
+*/
+
+bot.action(
+    /^search_type_(.+)_(.+)$/,
+    async (ctx) => {
+
+        const telegramId =
+            String(ctx.from.id)
+
+        const type =
+            ctx.match[1]
+
+        const session =
+            ctx.match[2]
+
+        searchStates[telegramId] = {
+
+            questionType: type,
+
+            session: session,
+
+            waitingCourse: true
 
         }
-    )
 
-    /*
-    ========================================
-    SEARCH TYPE
-    ========================================
-    */
+        await ctx.answerCbQuery()
 
-    bot.action(
-        /^search_type_(.+)_(.+)$/,
-        async (ctx) => {
+        await ctx.editMessageText(
 
-            const telegramId =
-                String(ctx.from.id)
-
-            const type =
-                ctx.match[1]
-
-            const session =
-                ctx.match[2]
-
-            searchStates[telegramId] = {
-
-                questionType: type,
-
-                session: session,
-
-                waitingCourse: true
-
-            }
-
-            await ctx.answerCbQuery()
-
-            await ctx.editMessageText(
-
-                `📚 Send Course Code
+            `📚 Send Course Code
 
 Example:
 CSE221
@@ -835,42 +922,48 @@ CSE221
 📅 ${session}
 📄 ${type.toUpperCase()}`,
 
-                Markup.inlineKeyboard([
+            Markup.inlineKeyboard([
 
-                    [
-                        Markup.button.callback(
-                            '⬅ Back',
-                            `search_session_${session}`
-                        )
-                    ]
+                [
+                    Markup.button.callback(
+                        '⬅ Back',
+                        `search_session_${session}`
+                    )
+                ]
 
-                ])
+            ])
 
-            )
+        )
 
-        }
-    )
+    }
+)
 
-    /*
-    ========================================
-    ADMIN PANEL
-    ========================================
-    */
+/*
+========================================
+ADMIN PANEL
+========================================
+*/
 
-    bot.action('admin', async (ctx) => {
+bot.action(
+    'admin',
+    async (ctx) => {
 
         const telegramId =
             String(ctx.from.id)
 
-        const userDoc = await db
-            .collection('users')
-            .doc(telegramId)
-            .get()
+        const userDoc =
+            await db
+                .collection('users')
+                .doc(telegramId)
+                .get()
 
         const userData =
             userDoc.data()
 
-        if (userData.role !== 'admin') {
+        if (
+            userData.role !==
+            'admin'
+        ) {
 
             return ctx.answerCbQuery(
                 '❌ Admin Only'
@@ -909,24 +1002,30 @@ CSE221
 
         )
 
-    })
+    }
+)
 
-    /*
-    ========================================
-    PENDING PDFS
-    ========================================
-    */
+/*
+========================================
+PENDING PDFS
+========================================
+*/
 
-    bot.action('pending', async (ctx) => {
+bot.action(
+    'pending',
+    async (ctx) => {
 
-        const snapshot = await db
-            .collection('questions')
-            .where(
-                'status',
-                '==',
-                'pending'
-            )
-            .get()
+        const snapshot =
+            await db
+                .collection(
+                    'questions'
+                )
+                .where(
+                    'status',
+                    '==',
+                    'pending'
+                )
+                .get()
 
         if (snapshot.empty) {
 
@@ -936,13 +1035,15 @@ CSE221
 
         }
 
-        snapshot.forEach(async (doc) => {
+        snapshot.forEach(
+            async (doc) => {
 
-            const data = doc.data()
+                const data =
+                    doc.data()
 
-            await ctx.reply(
+                await ctx.reply(
 
-                `📄 ${data.fileName}
+                    `📄 ${data.fileName}
 
 📚 ${data.courseCode}
 
@@ -950,35 +1051,39 @@ CSE221
 
 📅 ${data.semester}`,
 
-                Markup.inlineKeyboard([
+                    Markup.inlineKeyboard([
 
-                    [
-                        Markup.button.callback(
-                            '✅ Approve',
-                            `approve_${doc.id}`
-                        ),
+                        [
+                            Markup.button.callback(
+                                '✅ Approve',
+                                `approve_${doc.id}`
+                            ),
 
-                        Markup.button.callback(
-                            '❌ Reject',
-                            `reject_${doc.id}`
-                        )
-                    ]
+                            Markup.button.callback(
+                                '❌ Reject',
+                                `reject_${doc.id}`
+                            )
+                        ]
 
-                ])
+                    ])
 
-            )
+                )
 
-        })
+            }
+        )
 
-    })
+    }
+)
 
-    /*
-    ========================================
-    APPROVE
-    ========================================
-    */
+/*
+========================================
+APPROVE
+========================================
+*/
 
-    bot.action(/^approve_(.+)$/, async (ctx) => {
+bot.action(
+    /^approve_(.+)$/,
+    async (ctx) => {
 
         const questionId =
             ctx.match[1]
@@ -988,7 +1093,8 @@ CSE221
             .doc(questionId)
             .update({
 
-                status: 'approved'
+                status:
+                    'approved'
 
             })
 
@@ -1000,15 +1106,18 @@ CSE221
             '✅ Question Approved'
         )
 
-    })
+    }
+)
 
-    /*
-    ========================================
-    REJECT
-    ========================================
-    */
+/*
+========================================
+REJECT
+========================================
+*/
 
-    bot.action(/^reject_(.+)$/, async (ctx) => {
+bot.action(
+    /^reject_(.+)$/,
+    async (ctx) => {
 
         const questionId =
             ctx.match[1]
@@ -1018,7 +1127,8 @@ CSE221
             .doc(questionId)
             .update({
 
-                status: 'rejected'
+                status:
+                    'rejected'
 
             })
 
@@ -1030,21 +1140,25 @@ CSE221
             '❌ Question Rejected'
         )
 
-    })
+    }
+)
 
-    /*
-    ========================================
-    BROADCAST
-    ========================================
-    */
+/*
+========================================
+BROADCAST
+========================================
+*/
 
-    bot.action('broadcast', async (ctx) => {
+bot.action(
+    'broadcast',
+    async (ctx) => {
 
         const telegramId =
             String(ctx.from.id)
 
-        broadcastStates[telegramId] =
-            true
+        broadcastStates[
+            telegramId
+        ] = true
 
         await ctx.answerCbQuery()
 
@@ -1052,15 +1166,18 @@ CSE221
             '📢 Send Notice Message'
         )
 
-    })
+    }
+)
 
-    /*
-    ========================================
-    CSE MENU
-    ========================================
-    */
+/*
+========================================
+CSE MENU
+========================================
+*/
 
-    bot.action('cse', async (ctx) => {
+bot.action(
+    'cse',
+    async (ctx) => {
 
         await ctx.answerCbQuery()
 
@@ -1107,17 +1224,21 @@ Choose Session 👇`,
 
         )
 
-    })
+    }
+)
 
-    /*
-    ========================================
-    CSE SESSION
-    ========================================
-    */
+/*
+========================================
+CSE SESSION
+========================================
+*/
 
-    bot.action(/^cse_session_(.+)$/, async (ctx) => {
+bot.action(
+    /^cse_session_(.+)$/,
+    async (ctx) => {
 
-        const session = ctx.match[1]
+        const session =
+            ctx.match[1]
 
         await ctx.answerCbQuery()
 
@@ -1164,26 +1285,32 @@ Choose Question Type 👇`,
 
         )
 
-    })
+    }
+)
 
-    /*
-    ========================================
-    VIEW QUESTIONS
-    ========================================
-    */
+/*
+========================================
+VIEW QUESTIONS
+========================================
+*/
 
-    bot.action(
-        /^view_(.+)_(.+)$/,
-        async (ctx) => {
+bot.action(
+    /^view_(.+)_(.+)$/,
+    async (ctx) => {
 
-            const type = ctx.match[1]
+        const type =
+            ctx.match[1]
 
-            const session = ctx.match[2]
+        const session =
+            ctx.match[2]
 
-            await ctx.answerCbQuery()
+        await ctx.answerCbQuery()
 
-            const snapshot = await db
-                .collection('questions')
+        const snapshot =
+            await db
+                .collection(
+                    'questions'
+                )
                 .where(
                     'questionType',
                     '==',
@@ -1201,26 +1328,28 @@ Choose Question Type 👇`,
                 )
                 .get()
 
-            if (snapshot.empty) {
+        if (snapshot.empty) {
 
-                return ctx.reply(
-                    '❌ No Questions Found'
-                )
+            return ctx.reply(
+                '❌ No Questions Found'
+            )
 
-            }
+        }
 
-            await ctx.reply(
+        await ctx.reply(
 
-                `✅ ${snapshot.size} Question(s) Found
+            `✅ ${snapshot.size} Question(s) Found
 
 📅 ${session}
 📄 ${type.toUpperCase()}`
 
-            )
+        )
 
-            snapshot.forEach(async (doc) => {
+        snapshot.forEach(
+            async (doc) => {
 
-                const data = doc.data()
+                const data =
+                    doc.data()
 
                 await ctx.replyWithDocument(
 
@@ -1241,32 +1370,38 @@ Choose Question Type 👇`,
 
                 )
 
-            })
+            }
+        )
 
-        }
-    )
+    }
+)
 
-    /*
-    ========================================
-    HOME BUTTON
-    ========================================
-    */
+/*
+========================================
+HOME BUTTON
+========================================
+*/
 
-    bot.action('home', async (ctx) => {
+bot.action(
+    'home',
+    async (ctx) => {
 
         await ctx.answerCbQuery()
 
         await showHome(ctx)
 
-    })
+    }
+)
 
-    /*
-    ========================================
-    LOGOUT
-    ========================================
-    */
+/*
+========================================
+LOGOUT
+========================================
+*/
 
-    bot.action('logout', async (ctx) => {
+bot.action(
+    'logout',
+    async (ctx) => {
 
         await ctx.answerCbQuery(
             '🚪 Logged Out'
@@ -1280,16 +1415,27 @@ Send /start to login again.`
 
         )
 
-    })
+    }
+)
 
-    /*
-    ========================================
-    RUN BOT
-    ========================================
-    */
+/*
+========================================
+RUN BOT
+========================================
+*/
 
-    bot.launch()
+bot.launch()
 
-    console.log(
-        '✅ Secure University Bot Running...'
-    )
+console.log(
+    '✅ Secure University Bot Running...'
+)
+
+process.once(
+    'SIGINT',
+    () => bot.stop('SIGINT')
+)
+
+process.once(
+    'SIGTERM',
+    () => bot.stop('SIGTERM')
+)
