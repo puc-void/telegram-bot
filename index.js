@@ -141,237 +141,219 @@ Send your University Student ID 👇`
     */
 
     await ctx.reply(
-        '✅ Login Successful'
+
+        `🎓 Welcome Back
+
+Choose an option 👇`,
+
+        Markup.inlineKeyboard([
+
+            [
+                Markup.button.callback(
+                    '💻 CSE',
+                    'cse'
+                ),
+
+                Markup.button.callback(
+                    '📤 Upload',
+                    'upload_pdf'
+                )
+            ],
+
+            [
+                Markup.button.callback(
+                    '🔍 Search',
+                    'search_menu'
+                ),
+
+                Markup.button.callback(
+                    '👨‍💼 Admin',
+                    'admin'
+                )
+            ],
+
+            [
+                Markup.button.callback(
+                    '🚪 Logout',
+                    'logout'
+                )
+            ]
+
+        ])
+
     )
 
-    setTimeout(async () => {
-
-        await ctx.telegram.editMessageText(
-
-            ctx.chat.id,
-            ctx.message.message_id + 1,
-            null,
-
-            `🎓 Welcome Back
-
-Loading Dashboard...`,
-
-            {
-                reply_markup: {
-                    inline_keyboard: [
-
-                        [
-                            {
-                                text: '💻 CSE',
-                                callback_data: 'cse'
-                            },
-
-                            {
-                                text: '📤 Upload',
-                                callback_data: 'upload_pdf'
-                            }
-                        ],
-
-                        [
-                            {
-                                text: '🔍 Search',
-                                callback_data: 'search_menu'
-                            },
-
-                            {
-                                text: '👨‍💼 Admin',
-                                callback_data: 'admin'
-                            }
-                        ],
-
-                        [
-                            {
-                                text: '🚪 Logout',
-                                callback_data: 'logout'
-                            }
-                        ]
-
-                    ]
-                }
-            }
-
-        )
-
-    }, 1000)
-
-})
-
-/*
-========================================
-TEXT SYSTEM
-========================================
-*/
-
-bot.on('text', async (ctx) => {
-
-    const telegramId = String(ctx.from.id)
-
-    const message = ctx.message.text
-
     /*
-    SIGNUP
+    ========================================
+    TEXT SYSTEM
+    ========================================
     */
 
-    if (waitingForSignup[telegramId]) {
+    bot.on('text', async (ctx) => {
 
-        if (message.length < 5) {
+        const telegramId = String(ctx.from.id)
+
+        const message = ctx.message.text
+
+        /*
+        SIGNUP
+        */
+
+        if (waitingForSignup[telegramId]) {
+
+            if (message.length < 5) {
+
+                return ctx.reply(
+                    '❌ Invalid Student ID'
+                )
+
+            }
+
+            let role = 'student'
+
+            if (
+                telegramId === process.env.ADMIN_ID
+            ) {
+
+                role = 'admin'
+
+            }
+
+            await db.collection('users')
+                .doc(telegramId)
+                .set({
+
+                    studentId: message,
+
+                    telegramId: telegramId,
+
+                    firstName:
+                        ctx.from.first_name || '',
+
+                    username:
+                        ctx.from.username || '',
+
+                    role: role,
+
+                    uploads: 0,
+
+                    createdAt: new Date()
+
+                })
+
+            delete waitingForSignup[telegramId]
 
             return ctx.reply(
-                '❌ Invalid Student ID'
+
+                `✅ Signup Successful
+
+Now send /start again.`
+
             )
 
         }
 
-        let role = 'student'
+        /*
+        COURSE INPUT FOR UPLOAD
+        */
 
         if (
-            telegramId === process.env.ADMIN_ID
+            uploadStates[telegramId] &&
+            uploadStates[telegramId].waitingCourse
         ) {
 
-            role = 'admin'
+            uploadStates[telegramId].courseCode =
+                message.toUpperCase()
 
-        }
+            uploadStates[telegramId].waitingCourse =
+                false
 
-        await db.collection('users')
-            .doc(telegramId)
-            .set({
+            uploadStates[telegramId].readyForPDF =
+                true
 
-                studentId: message,
+            return ctx.reply(
 
-                telegramId: telegramId,
-
-                firstName:
-                    ctx.from.first_name || '',
-
-                username:
-                    ctx.from.username || '',
-
-                role: role,
-
-                uploads: 0,
-
-                createdAt: new Date()
-
-            })
-
-        delete waitingForSignup[telegramId]
-
-        return ctx.reply(
-
-            `✅ Signup Successful
-
-Now send /start again.`
-
-        )
-
-    }
-
-    /*
-    COURSE INPUT FOR UPLOAD
-    */
-
-    if (
-        uploadStates[telegramId] &&
-        uploadStates[telegramId].waitingCourse
-    ) {
-
-        uploadStates[telegramId].courseCode =
-            message.toUpperCase()
-
-        uploadStates[telegramId].waitingCourse =
-            false
-
-        uploadStates[telegramId].readyForPDF =
-            true
-
-        return ctx.reply(
-
-            `✅ Course Saved
+                `✅ Course Saved
 
 📚 ${message.toUpperCase()}
 
 Now send PDF file 👇`
 
-        )
-
-    }
-
-    /*
-    SEARCH COURSE INPUT
-    */
-
-    if (
-        searchStates[telegramId] &&
-        searchStates[telegramId].waitingCourse
-    ) {
-
-        const searchData =
-            searchStates[telegramId]
-
-        const courseCode =
-            message.toUpperCase()
-
-        const snapshot = await db
-            .collection('questions')
-            .where(
-                'courseCode',
-                '==',
-                courseCode
-            )
-            .where(
-                'semester',
-                '==',
-                searchData.session
-            )
-            .where(
-                'questionType',
-                '==',
-                searchData.questionType
-            )
-            .where(
-                'status',
-                '==',
-                'approved'
-            )
-            .get()
-
-        if (snapshot.empty) {
-
-            delete searchStates[telegramId]
-
-            return ctx.reply(
-                '❌ No Questions Found'
             )
 
         }
 
-        await ctx.reply(
+        /*
+        SEARCH COURSE INPUT
+        */
 
-            `✅ ${snapshot.size} Question(s) Found
+        if (
+            searchStates[telegramId] &&
+            searchStates[telegramId].waitingCourse
+        ) {
+
+            const searchData =
+                searchStates[telegramId]
+
+            const courseCode =
+                message.toUpperCase()
+
+            const snapshot = await db
+                .collection('questions')
+                .where(
+                    'courseCode',
+                    '==',
+                    courseCode
+                )
+                .where(
+                    'semester',
+                    '==',
+                    searchData.session
+                )
+                .where(
+                    'questionType',
+                    '==',
+                    searchData.questionType
+                )
+                .where(
+                    'status',
+                    '==',
+                    'approved'
+                )
+                .get()
+
+            if (snapshot.empty) {
+
+                delete searchStates[telegramId]
+
+                return ctx.reply(
+                    '❌ No Questions Found'
+                )
+
+            }
+
+            await ctx.reply(
+
+                `✅ ${snapshot.size} Question(s) Found
 
 📚 ${courseCode}
 📅 ${searchData.session}
 📄 ${searchData.questionType.toUpperCase()}`
 
-        )
+            )
 
-        snapshot.forEach(async (doc) => {
+            snapshot.forEach(async (doc) => {
 
-            const data = doc.data()
+                const data = doc.data()
 
-            await ctx.replyWithDocument(
+                await ctx.replyWithDocument(
 
-                data.fileId,
+                    data.fileId,
 
-                {
-                    caption:
+                    {
+                        caption:
 
-                        `📚 ${data.courseCode}
+                            `📚 ${data.courseCode}
 
 📄 ${data.questionType}
 
@@ -379,310 +361,310 @@ Now send PDF file 👇`
 
 📁 ${data.fileName}`
 
-                }
+                    }
 
-            )
+                )
 
-        })
+            })
 
-        delete searchStates[telegramId]
+            delete searchStates[telegramId]
 
-    }
+        }
 
-    /*
-    BROADCAST
-    */
+        /*
+        BROADCAST
+        */
 
-    if (broadcastStates[telegramId]) {
+        if (broadcastStates[telegramId]) {
 
-        const users = await db
-            .collection('users')
-            .get()
+            const users = await db
+                .collection('users')
+                .get()
 
-        users.forEach(async (user) => {
+            users.forEach(async (user) => {
 
-            const userData = user.data()
+                const userData = user.data()
 
-            try {
+                try {
 
-                await ctx.telegram.sendMessage(
+                    await ctx.telegram.sendMessage(
 
-                    userData.telegramId,
+                        userData.telegramId,
 
-                    `📢 Notice
+                        `📢 Notice
 
 ${message}`
 
-                )
+                    )
 
-            } catch (error) {
+                } catch (error) {
 
-                console.log(error)
+                    console.log(error)
 
-            }
+                }
 
-        })
+            })
 
-        delete broadcastStates[telegramId]
+            delete broadcastStates[telegramId]
 
-        return ctx.reply(
-            '✅ Notice Broadcasted'
-        )
+            return ctx.reply(
+                '✅ Notice Broadcasted'
+            )
 
-    }
-
-})
-
-/*
-========================================
-UPLOAD MENU
-========================================
-*/
-
-bot.action('upload_pdf', async (ctx) => {
-
-    await ctx.answerCbQuery()
-
-    await ctx.editMessageText(
-
-        `📤 Upload Question PDF
-
-Choose Question Type 👇`,
-
-        Markup.inlineKeyboard([
-
-            [
-                Markup.button.callback(
-                    '📄 Mid',
-                    'upload_mid'
-                ),
-
-                Markup.button.callback(
-                    '📄 Final',
-                    'upload_final'
-                )
-            ],
-
-            [
-                Markup.button.callback(
-                    '🎤 Viva',
-                    'upload_viva'
-                ),
-
-                Markup.button.callback(
-                    '🧪 Lab',
-                    'upload_lab'
-                )
-            ],
-
-            [
-                Markup.button.callback(
-                    '⬅ Back',
-                    'home'
-                )
-            ]
-
-        ])
-
-    )
-
-})
-
-/*
-========================================
-UPLOAD TYPE
-========================================
-*/
-
-bot.action(/^upload_(.+)$/, async (ctx) => {
-
-    const telegramId = String(ctx.from.id)
-
-    const type = ctx.match[1]
-
-    uploadStates[telegramId] = {
-
-        questionType: type
-
-    }
-
-    await ctx.answerCbQuery()
-
-    await ctx.editMessageText(
-
-        `📅 Choose Session 👇`,
-
-        Markup.inlineKeyboard([
-
-            [
-                Markup.button.callback(
-                    'Fall-2023',
-                    'session_Fall-2023'
-                ),
-
-                Markup.button.callback(
-                    'Spring-2024',
-                    'session_Spring-2024'
-                )
-            ],
-
-            [
-                Markup.button.callback(
-                    'Fall-2024',
-                    'session_Fall-2024'
-                ),
-
-                Markup.button.callback(
-                    'Spring-2025',
-                    'session_Spring-2025'
-                )
-            ],
-
-            [
-                Markup.button.callback(
-                    '⬅ Back',
-                    'upload_pdf'
-                )
-            ]
-
-        ])
-
-    )
-
-})
-
-/*
-========================================
-SESSION SELECT
-========================================
-*/
-
-bot.action(/^session_(.+)$/, async (ctx) => {
-
-    const telegramId = String(ctx.from.id)
-
-    if (!uploadStates[telegramId]) return
-
-    const session = ctx.match[1]
-
-    uploadStates[telegramId].semester =
-        session
-
-    uploadStates[telegramId].waitingCourse =
-        true
-
-    await ctx.answerCbQuery()
-
-    await ctx.editMessageText(
-
-        `📚 Send Course Code
-
-Example:
-CSE221`,
-
-        Markup.inlineKeyboard([
-
-            [
-                Markup.button.callback(
-                    '⬅ Back',
-                    'upload_pdf'
-                )
-            ]
-
-        ])
-
-    )
-
-})
-
-/*
-========================================
-PDF UPLOAD
-========================================
-*/
-
-bot.on('document', async (ctx) => {
-
-    const telegramId = String(ctx.from.id)
-
-    if (
-        !uploadStates[telegramId] ||
-        !uploadStates[telegramId].readyForPDF
-    ) return
-
-    const document =
-        ctx.message.document
-
-    /*
-    PDF CHECK
-    */
-
-    if (
-        document.mime_type !==
-        'application/pdf'
-    ) {
-
-        return ctx.reply(
-            '❌ Only PDF Allowed'
-        )
-
-    }
-
-    const uploadData =
-        uploadStates[telegramId]
-
-    /*
-    SAVE PDF
-    */
-
-    await db.collection('questions').add({
-
-        uploadedBy: telegramId,
-
-        fileName:
-            document.file_name,
-
-        fileId:
-            document.file_id,
-
-        department: 'CSE',
-
-        questionType:
-            uploadData.questionType,
-
-        semester:
-            uploadData.semester,
-
-        courseCode:
-            uploadData.courseCode,
-
-        status: 'pending',
-
-        createdAt: new Date()
+        }
 
     })
 
     /*
-    UPDATE UPLOAD COUNT
+    ========================================
+    UPLOAD MENU
+    ========================================
     */
 
-    await db
-        .collection('users')
-        .doc(telegramId)
-        .update({
+    bot.action('upload_pdf', async (ctx) => {
 
-            uploads:
-                admin.firestore
-                    .FieldValue
-                    .increment(1)
+        await ctx.answerCbQuery()
+
+        await ctx.editMessageText(
+
+            `📤 Upload Question PDF
+
+Choose Question Type 👇`,
+
+            Markup.inlineKeyboard([
+
+                [
+                    Markup.button.callback(
+                        '📄 Mid',
+                        'upload_mid'
+                    ),
+
+                    Markup.button.callback(
+                        '📄 Final',
+                        'upload_final'
+                    )
+                ],
+
+                [
+                    Markup.button.callback(
+                        '🎤 Viva',
+                        'upload_viva'
+                    ),
+
+                    Markup.button.callback(
+                        '🧪 Lab',
+                        'upload_lab'
+                    )
+                ],
+
+                [
+                    Markup.button.callback(
+                        '⬅ Back',
+                        'home'
+                    )
+                ]
+
+            ])
+
+        )
+
+    })
+
+    /*
+    ========================================
+    UPLOAD TYPE
+    ========================================
+    */
+
+    bot.action(/^upload_(.+)$/, async (ctx) => {
+
+        const telegramId = String(ctx.from.id)
+
+        const type = ctx.match[1]
+
+        uploadStates[telegramId] = {
+
+            questionType: type
+
+        }
+
+        await ctx.answerCbQuery()
+
+        await ctx.editMessageText(
+
+            `📅 Choose Session 👇`,
+
+            Markup.inlineKeyboard([
+
+                [
+                    Markup.button.callback(
+                        'Fall-2023',
+                        'session_Fall-2023'
+                    ),
+
+                    Markup.button.callback(
+                        'Spring-2024',
+                        'session_Spring-2024'
+                    )
+                ],
+
+                [
+                    Markup.button.callback(
+                        'Fall-2024',
+                        'session_Fall-2024'
+                    ),
+
+                    Markup.button.callback(
+                        'Spring-2025',
+                        'session_Spring-2025'
+                    )
+                ],
+
+                [
+                    Markup.button.callback(
+                        '⬅ Back',
+                        'upload_pdf'
+                    )
+                ]
+
+            ])
+
+        )
+
+    })
+
+    /*
+    ========================================
+    SESSION SELECT
+    ========================================
+    */
+
+    bot.action(/^session_(.+)$/, async (ctx) => {
+
+        const telegramId = String(ctx.from.id)
+
+        if (!uploadStates[telegramId]) return
+
+        const session = ctx.match[1]
+
+        uploadStates[telegramId].semester =
+            session
+
+        uploadStates[telegramId].waitingCourse =
+            true
+
+        await ctx.answerCbQuery()
+
+        await ctx.editMessageText(
+
+            `📚 Send Course Code
+
+Example:
+CSE221`,
+
+            Markup.inlineKeyboard([
+
+                [
+                    Markup.button.callback(
+                        '⬅ Back',
+                        'upload_pdf'
+                    )
+                ]
+
+            ])
+
+        )
+
+    })
+
+    /*
+    ========================================
+    PDF UPLOAD
+    ========================================
+    */
+
+    bot.on('document', async (ctx) => {
+
+        const telegramId = String(ctx.from.id)
+
+        if (
+            !uploadStates[telegramId] ||
+            !uploadStates[telegramId].readyForPDF
+        ) return
+
+        const document =
+            ctx.message.document
+
+        /*
+        PDF CHECK
+        */
+
+        if (
+            document.mime_type !==
+            'application/pdf'
+        ) {
+
+            return ctx.reply(
+                '❌ Only PDF Allowed'
+            )
+
+        }
+
+        const uploadData =
+            uploadStates[telegramId]
+
+        /*
+        SAVE PDF
+        */
+
+        await db.collection('questions').add({
+
+            uploadedBy: telegramId,
+
+            fileName:
+                document.file_name,
+
+            fileId:
+                document.file_id,
+
+            department: 'CSE',
+
+            questionType:
+                uploadData.questionType,
+
+            semester:
+                uploadData.semester,
+
+            courseCode:
+                uploadData.courseCode,
+
+            status: 'pending',
+
+            createdAt: new Date()
 
         })
 
-    delete uploadStates[telegramId]
+        /*
+        UPDATE UPLOAD COUNT
+        */
 
-    ctx.reply(
+        await db
+            .collection('users')
+            .doc(telegramId)
+            .update({
 
-        `✅ PDF Uploaded Successfully
+                uploads:
+                    admin.firestore
+                        .FieldValue
+                        .increment(1)
+
+            })
+
+        delete uploadStates[telegramId]
+
+        ctx.reply(
+
+            `✅ PDF Uploaded Successfully
 
 📚 ${uploadData.courseCode}
 
@@ -692,77 +674,450 @@ bot.on('document', async (ctx) => {
 
 ⏳ Waiting For Admin Approval`
 
-    )
+        )
 
-})
+    })
 
-/*
-========================================
-SEARCH MENU
-========================================
-*/
+    /*
+    ========================================
+    SEARCH MENU
+    ========================================
+    */
 
-bot.action('search_menu', async (ctx) => {
+    bot.action('search_menu', async (ctx) => {
 
-    await ctx.answerCbQuery()
+        await ctx.answerCbQuery()
 
-    await ctx.editMessageText(
+        await ctx.editMessageText(
 
-        `🔍 Search Questions
+            `🔍 Search Questions
 
 Choose Session 👇`,
 
-        Markup.inlineKeyboard([
+            Markup.inlineKeyboard([
 
-            [
-                Markup.button.callback(
-                    'Fall-2023',
-                    'search_session_Fall-2023'
-                ),
+                [
+                    Markup.button.callback(
+                        'Fall-2023',
+                        'search_session_Fall-2023'
+                    ),
 
-                Markup.button.callback(
-                    'Spring-2024',
-                    'search_session_Spring-2024'
-                )
-            ],
+                    Markup.button.callback(
+                        'Spring-2024',
+                        'search_session_Spring-2024'
+                    )
+                ],
 
-            [
-                Markup.button.callback(
-                    'Fall-2024',
-                    'search_session_Fall-2024'
-                ),
+                [
+                    Markup.button.callback(
+                        'Fall-2024',
+                        'search_session_Fall-2024'
+                    ),
 
-                Markup.button.callback(
-                    'Spring-2025',
-                    'search_session_Spring-2025'
-                )
-            ],
+                    Markup.button.callback(
+                        'Spring-2025',
+                        'search_session_Spring-2025'
+                    )
+                ],
 
-            [
-                Markup.button.callback(
-                    '⬅ Back',
-                    'home'
-                )
-            ]
+                [
+                    Markup.button.callback(
+                        '⬅ Back',
+                        'home'
+                    )
+                ]
 
-        ])
+            ])
 
+        )
+
+    })
+
+    /*
+    ========================================
+    SEARCH SESSION
+    ========================================
+    */
+
+    bot.action(
+        /^search_session_(.+)$/,
+        async (ctx) => {
+
+            const session =
+                ctx.match[1]
+
+            await ctx.answerCbQuery()
+
+            await ctx.editMessageText(
+
+                `📅 ${session}
+
+Choose Question Type 👇`,
+
+                Markup.inlineKeyboard([
+
+                    [
+                        Markup.button.callback(
+                            '📄 Mid',
+                            `search_type_mid_${session}`
+                        ),
+
+                        Markup.button.callback(
+                            '📄 Final',
+                            `search_type_final_${session}`
+                        )
+                    ],
+
+                    [
+                        Markup.button.callback(
+                            '🎤 Viva',
+                            `search_type_viva_${session}`
+                        ),
+
+                        Markup.button.callback(
+                            '🧪 Lab',
+                            `search_type_lab_${session}`
+                        )
+                    ],
+
+                    [
+                        Markup.button.callback(
+                            '⬅ Back',
+                            'search_menu'
+                        )
+                    ]
+
+                ])
+
+            )
+
+        }
     )
 
-})
+    /*
+    ========================================
+    SEARCH TYPE
+    ========================================
+    */
 
-/*
-========================================
-SEARCH SESSION
-========================================
-*/
+    bot.action(
+        /^search_type_(.+)_(.+)$/,
+        async (ctx) => {
 
-bot.action(
-    /^search_session_(.+)$/,
-    async (ctx) => {
+            const telegramId =
+                String(ctx.from.id)
 
-        const session =
+            const type =
+                ctx.match[1]
+
+            const session =
+                ctx.match[2]
+
+            searchStates[telegramId] = {
+
+                questionType: type,
+
+                session: session,
+
+                waitingCourse: true
+
+            }
+
+            await ctx.answerCbQuery()
+
+            await ctx.editMessageText(
+
+                `📚 Send Course Code
+
+Example:
+CSE221
+
+📅 ${session}
+📄 ${type.toUpperCase()}`,
+
+                Markup.inlineKeyboard([
+
+                    [
+                        Markup.button.callback(
+                            '⬅ Back',
+                            `search_session_${session}`
+                        )
+                    ]
+
+                ])
+
+            )
+
+        }
+    )
+
+    /*
+    ========================================
+    ADMIN PANEL
+    ========================================
+    */
+
+    bot.action('admin', async (ctx) => {
+
+        const telegramId =
+            String(ctx.from.id)
+
+        const userDoc = await db
+            .collection('users')
+            .doc(telegramId)
+            .get()
+
+        const userData =
+            userDoc.data()
+
+        if (userData.role !== 'admin') {
+
+            return ctx.answerCbQuery(
+                '❌ Admin Only'
+            )
+
+        }
+
+        await ctx.answerCbQuery()
+
+        await ctx.editMessageText(
+
+            `👨‍💼 Admin Panel`,
+
+            Markup.inlineKeyboard([
+
+                [
+                    Markup.button.callback(
+                        '📄 Pending',
+                        'pending'
+                    ),
+
+                    Markup.button.callback(
+                        '📢 Broadcast',
+                        'broadcast'
+                    )
+                ],
+
+                [
+                    Markup.button.callback(
+                        '⬅ Back',
+                        'home'
+                    )
+                ]
+
+            ])
+
+        )
+
+    })
+
+    /*
+    ========================================
+    PENDING PDFS
+    ========================================
+    */
+
+    bot.action('pending', async (ctx) => {
+
+        const snapshot = await db
+            .collection('questions')
+            .where(
+                'status',
+                '==',
+                'pending'
+            )
+            .get()
+
+        if (snapshot.empty) {
+
+            return ctx.reply(
+                '✅ No Pending Questions'
+            )
+
+        }
+
+        snapshot.forEach(async (doc) => {
+
+            const data = doc.data()
+
+            await ctx.reply(
+
+                `📄 ${data.fileName}
+
+📚 ${data.courseCode}
+
+📄 ${data.questionType}
+
+📅 ${data.semester}`,
+
+                Markup.inlineKeyboard([
+
+                    [
+                        Markup.button.callback(
+                            '✅ Approve',
+                            `approve_${doc.id}`
+                        ),
+
+                        Markup.button.callback(
+                            '❌ Reject',
+                            `reject_${doc.id}`
+                        )
+                    ]
+
+                ])
+
+            )
+
+        })
+
+    })
+
+    /*
+    ========================================
+    APPROVE
+    ========================================
+    */
+
+    bot.action(/^approve_(.+)$/, async (ctx) => {
+
+        const questionId =
             ctx.match[1]
+
+        await db
+            .collection('questions')
+            .doc(questionId)
+            .update({
+
+                status: 'approved'
+
+            })
+
+        await ctx.answerCbQuery(
+            '✅ Approved'
+        )
+
+        await ctx.editMessageText(
+            '✅ Question Approved'
+        )
+
+    })
+
+    /*
+    ========================================
+    REJECT
+    ========================================
+    */
+
+    bot.action(/^reject_(.+)$/, async (ctx) => {
+
+        const questionId =
+            ctx.match[1]
+
+        await db
+            .collection('questions')
+            .doc(questionId)
+            .update({
+
+                status: 'rejected'
+
+            })
+
+        await ctx.answerCbQuery(
+            '❌ Rejected'
+        )
+
+        await ctx.editMessageText(
+            '❌ Question Rejected'
+        )
+
+    })
+
+    /*
+    ========================================
+    BROADCAST
+    ========================================
+    */
+
+    bot.action('broadcast', async (ctx) => {
+
+        const telegramId =
+            String(ctx.from.id)
+
+        broadcastStates[telegramId] =
+            true
+
+        await ctx.answerCbQuery()
+
+        await ctx.reply(
+            '📢 Send Notice Message'
+        )
+
+    })
+
+    /*
+    ========================================
+    CSE MENU
+    ========================================
+    */
+
+    bot.action('cse', async (ctx) => {
+
+        await ctx.answerCbQuery()
+
+        await ctx.editMessageText(
+
+            `💻 CSE Department
+
+Choose Session 👇`,
+
+            Markup.inlineKeyboard([
+
+                [
+                    Markup.button.callback(
+                        'Fall-2023',
+                        'cse_session_Fall-2023'
+                    ),
+
+                    Markup.button.callback(
+                        'Spring-2024',
+                        'cse_session_Spring-2024'
+                    )
+                ],
+
+                [
+                    Markup.button.callback(
+                        'Fall-2024',
+                        'cse_session_Fall-2024'
+                    ),
+
+                    Markup.button.callback(
+                        'Spring-2025',
+                        'cse_session_Spring-2025'
+                    )
+                ],
+
+                [
+                    Markup.button.callback(
+                        '⬅ Back',
+                        'home'
+                    )
+                ]
+
+            ])
+
+        )
+
+    })
+
+    /*
+    ========================================
+    CSE SESSION
+    ========================================
+    */
+
+    bot.action(/^cse_session_(.+)$/, async (ctx) => {
+
+        const session = ctx.match[1]
 
         await ctx.answerCbQuery()
 
@@ -777,208 +1132,31 @@ Choose Question Type 👇`,
                 [
                     Markup.button.callback(
                         '📄 Mid',
-                        `search_type_mid_${session}`
+                        `view_mid_${session}`
                     ),
 
                     Markup.button.callback(
                         '📄 Final',
-                        `search_type_final_${session}`
+                        `view_final_${session}`
                     )
                 ],
 
                 [
                     Markup.button.callback(
                         '🎤 Viva',
-                        `search_type_viva_${session}`
+                        `view_viva_${session}`
                     ),
 
                     Markup.button.callback(
                         '🧪 Lab',
-                        `search_type_lab_${session}`
+                        `view_lab_${session}`
                     )
                 ],
 
                 [
                     Markup.button.callback(
                         '⬅ Back',
-                        'search_menu'
-                    )
-                ]
-
-            ])
-
-        )
-
-    }
-)
-
-/*
-========================================
-SEARCH TYPE
-========================================
-*/
-
-bot.action(
-    /^search_type_(.+)_(.+)$/,
-    async (ctx) => {
-
-        const telegramId =
-            String(ctx.from.id)
-
-        const type =
-            ctx.match[1]
-
-        const session =
-            ctx.match[2]
-
-        searchStates[telegramId] = {
-
-            questionType: type,
-
-            session: session,
-
-            waitingCourse: true
-
-        }
-
-        await ctx.answerCbQuery()
-
-        await ctx.editMessageText(
-
-            `📚 Send Course Code
-
-Example:
-CSE221
-
-📅 ${session}
-📄 ${type.toUpperCase()}`,
-
-            Markup.inlineKeyboard([
-
-                [
-                    Markup.button.callback(
-                        '⬅ Back',
-                        `search_session_${session}`
-                    )
-                ]
-
-            ])
-
-        )
-
-    }
-)
-
-/*
-========================================
-ADMIN PANEL
-========================================
-*/
-
-bot.action('admin', async (ctx) => {
-
-    const telegramId =
-        String(ctx.from.id)
-
-    const userDoc = await db
-        .collection('users')
-        .doc(telegramId)
-        .get()
-
-    const userData =
-        userDoc.data()
-
-    if (userData.role !== 'admin') {
-
-        return ctx.answerCbQuery(
-            '❌ Admin Only'
-        )
-
-    }
-
-    await ctx.answerCbQuery()
-
-    await ctx.editMessageText(
-
-        `👨‍💼 Admin Panel`,
-
-        Markup.inlineKeyboard([
-
-            [
-                Markup.button.callback(
-                    '📄 Pending',
-                    'pending'
-                ),
-
-                Markup.button.callback(
-                    '📢 Broadcast',
-                    'broadcast'
-                )
-            ],
-
-            [
-                Markup.button.callback(
-                    '⬅ Back',
-                    'home'
-                )
-            ]
-
-        ])
-
-    )
-
-})
-
-/*
-========================================
-PENDING PDFS
-========================================
-*/
-
-bot.action('pending', async (ctx) => {
-
-    const snapshot = await db
-        .collection('questions')
-        .where(
-            'status',
-            '==',
-            'pending'
-        )
-        .get()
-
-    if (snapshot.empty) {
-
-        return ctx.reply(
-            '✅ No Pending Questions'
-        )
-
-    }
-
-    snapshot.forEach(async (doc) => {
-
-        const data = doc.data()
-
-        await ctx.reply(
-
-            `📄 ${data.fileName}
-
-📚 ${data.courseCode}
-
-📄 ${data.questionType}
-
-📅 ${data.semester}`,
-
-            Markup.inlineKeyboard([
-
-                [
-                    Markup.button.callback(
-                        '✅ Approve',
-                        `approve_${doc.id}`
-                    ),
-
-                    Markup.button.callback(
-                        '❌ Reject',
-                        `reject_${doc.id}`
+                        'cse'
                     )
                 ]
 
@@ -988,266 +1166,70 @@ bot.action('pending', async (ctx) => {
 
     })
 
-})
+    /*
+    ========================================
+    VIEW QUESTIONS
+    ========================================
+    */
 
-/*
-========================================
-APPROVE
-========================================
-*/
+    bot.action(
+        /^view_(.+)_(.+)$/,
+        async (ctx) => {
 
-bot.action(/^approve_(.+)$/, async (ctx) => {
+            const type = ctx.match[1]
 
-    const questionId =
-        ctx.match[1]
+            const session = ctx.match[2]
 
-    await db
-        .collection('questions')
-        .doc(questionId)
-        .update({
+            await ctx.answerCbQuery()
 
-            status: 'approved'
-
-        })
-
-    await ctx.answerCbQuery(
-        '✅ Approved'
-    )
-
-    await ctx.editMessageText(
-        '✅ Question Approved'
-    )
-
-})
-
-/*
-========================================
-REJECT
-========================================
-*/
-
-bot.action(/^reject_(.+)$/, async (ctx) => {
-
-    const questionId =
-        ctx.match[1]
-
-    await db
-        .collection('questions')
-        .doc(questionId)
-        .update({
-
-            status: 'rejected'
-
-        })
-
-    await ctx.answerCbQuery(
-        '❌ Rejected'
-    )
-
-    await ctx.editMessageText(
-        '❌ Question Rejected'
-    )
-
-})
-
-/*
-========================================
-BROADCAST
-========================================
-*/
-
-bot.action('broadcast', async (ctx) => {
-
-    const telegramId =
-        String(ctx.from.id)
-
-    broadcastStates[telegramId] =
-        true
-
-    await ctx.answerCbQuery()
-
-    await ctx.reply(
-        '📢 Send Notice Message'
-    )
-
-})
-
-/*
-========================================
-CSE MENU
-========================================
-*/
-
-bot.action('cse', async (ctx) => {
-
-    await ctx.answerCbQuery()
-
-    await ctx.editMessageText(
-
-        `💻 CSE Department
-
-Choose Session 👇`,
-
-        Markup.inlineKeyboard([
-
-            [
-                Markup.button.callback(
-                    'Fall-2023',
-                    'cse_session_Fall-2023'
-                ),
-
-                Markup.button.callback(
-                    'Spring-2024',
-                    'cse_session_Spring-2024'
+            const snapshot = await db
+                .collection('questions')
+                .where(
+                    'questionType',
+                    '==',
+                    type
                 )
-            ],
-
-            [
-                Markup.button.callback(
-                    'Fall-2024',
-                    'cse_session_Fall-2024'
-                ),
-
-                Markup.button.callback(
-                    'Spring-2025',
-                    'cse_session_Spring-2025'
+                .where(
+                    'semester',
+                    '==',
+                    session
                 )
-            ],
-
-            [
-                Markup.button.callback(
-                    '⬅ Back',
-                    'home'
+                .where(
+                    'status',
+                    '==',
+                    'approved'
                 )
-            ]
+                .get()
 
-        ])
+            if (snapshot.empty) {
 
-    )
-
-})
-
-/*
-========================================
-CSE SESSION
-========================================
-*/
-
-bot.action(/^cse_session_(.+)$/, async (ctx) => {
-
-    const session = ctx.match[1]
-
-    await ctx.answerCbQuery()
-
-    await ctx.editMessageText(
-
-        `📅 ${session}
-
-Choose Question Type 👇`,
-
-        Markup.inlineKeyboard([
-
-            [
-                Markup.button.callback(
-                    '📄 Mid',
-                    `view_mid_${session}`
-                ),
-
-                Markup.button.callback(
-                    '📄 Final',
-                    `view_final_${session}`
+                return ctx.reply(
+                    '❌ No Questions Found'
                 )
-            ],
 
-            [
-                Markup.button.callback(
-                    '🎤 Viva',
-                    `view_viva_${session}`
-                ),
+            }
 
-                Markup.button.callback(
-                    '🧪 Lab',
-                    `view_lab_${session}`
-                )
-            ],
+            await ctx.reply(
 
-            [
-                Markup.button.callback(
-                    '⬅ Back',
-                    'cse'
-                )
-            ]
-
-        ])
-
-    )
-
-})
-
-/*
-========================================
-VIEW QUESTIONS
-========================================
-*/
-
-bot.action(
-    /^view_(.+)_(.+)$/,
-    async (ctx) => {
-
-        const type = ctx.match[1]
-
-        const session = ctx.match[2]
-
-        await ctx.answerCbQuery()
-
-        const snapshot = await db
-            .collection('questions')
-            .where(
-                'questionType',
-                '==',
-                type
-            )
-            .where(
-                'semester',
-                '==',
-                session
-            )
-            .where(
-                'status',
-                '==',
-                'approved'
-            )
-            .get()
-
-        if (snapshot.empty) {
-
-            return ctx.reply(
-                '❌ No Questions Found'
-            )
-
-        }
-
-        await ctx.reply(
-
-            `✅ ${snapshot.size} Question(s) Found
+                `✅ ${snapshot.size} Question(s) Found
 
 📅 ${session}
 📄 ${type.toUpperCase()}`
 
-        )
+            )
 
-        snapshot.forEach(async (doc) => {
+            snapshot.forEach(async (doc) => {
 
-            const data = doc.data()
+                const data = doc.data()
 
-            await ctx.replyWithDocument(
+                await ctx.replyWithDocument(
 
-                data.fileId,
+                    data.fileId,
 
-                {
-                    caption:
+                    {
+                        caption:
 
-                        `📚 ${data.courseCode}
+                            `📚 ${data.courseCode}
 
 📄 ${data.questionType}
 
@@ -1255,59 +1237,59 @@ bot.action(
 
 📁 ${data.fileName}`
 
-                }
+                    }
 
-            )
+                )
 
-        })
+            })
 
-    }
-)
-
-/*
-========================================
-HOME BUTTON
-========================================
-*/
-
-bot.action('home', async (ctx) => {
-
-    await ctx.answerCbQuery()
-
-    await showHome(ctx)
-
-})
-
-/*
-========================================
-LOGOUT
-========================================
-*/
-
-bot.action('logout', async (ctx) => {
-
-    await ctx.answerCbQuery(
-        '🚪 Logged Out'
+        }
     )
 
-    await ctx.editMessageText(
+    /*
+    ========================================
+    HOME BUTTON
+    ========================================
+    */
 
-        `✅ Logged Out
+    bot.action('home', async (ctx) => {
+
+        await ctx.answerCbQuery()
+
+        await showHome(ctx)
+
+    })
+
+    /*
+    ========================================
+    LOGOUT
+    ========================================
+    */
+
+    bot.action('logout', async (ctx) => {
+
+        await ctx.answerCbQuery(
+            '🚪 Logged Out'
+        )
+
+        await ctx.editMessageText(
+
+            `✅ Logged Out
 
 Send /start to login again.`
 
+        )
+
+    })
+
+    /*
+    ========================================
+    RUN BOT
+    ========================================
+    */
+
+    bot.launch()
+
+    console.log(
+        '✅ Secure University Bot Running...'
     )
-
-})
-
-/*
-========================================
-RUN BOT
-========================================
-*/
-
-bot.launch()
-
-console.log(
-    '✅ Secure University Bot Running...'
-)
