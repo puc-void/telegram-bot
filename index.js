@@ -1,12 +1,36 @@
 require('dotenv').config()
 
+
 const { Telegraf, Markup } = require('telegraf')
 const admin = require('firebase-admin')
+const express = require('express')
+
+const app = express()
+
+const PORT =
+    process.env.PORT || 3000
+
+app.get('/', (req, res) => {
+
+    res.send(
+        'University Bot Running ✅'
+    )
+
+})
+
+app.listen(PORT, () => {
+
+    console.log(
+        `Web Server Running On Port ${PORT}`
+    )
+
+})
 
 /*
 ========================================
 FIREBASE SETUP
 ========================================
+
 */
 
 admin.initializeApp({
